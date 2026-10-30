@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tisséo Live</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="theme-color" content="#e6007e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tisséo Live">
+<style>
+  /* Verre dépoli : surfaces translucides + flou, posées sur un fond coloré fixe */
+  :root { --bg:#0a0c12; --card:rgba(255,255,255,.07); --card-solid:#171a22; --edge:rgba(255,255,255,.14); --hi:rgba(255,255,255,.12);
+          --shadow:0 10px 30px rgba(0,0,0,.45); --overlay:rgba(10,12,18,.62); --fg:#f2f4f8; --mute:#9aa3b5; --acc:#e6007e; --ok:#2ecc71;
+          --b1:#e6007e66; --b2:#4f46e555; --b3:#06b6d444; color-scheme:dark; }
+  @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --bg:#e8ebf4; --card:rgba(255,255,255,.55); --card-solid:#fff; --edge:rgba(255,255,255,.8); --hi:rgba(255,255,255,.95);
+          --shadow:0 10px 30px rgba(40,50,120,.16), 0 0 0 1px rgba(30,40,100,.06); --overlay:rgba(232,235,244,.62); --fg:#14161c; --mute:#566075;
+          --b1:#ff5fb066; --b2:#7c8cff66; --b3:#5ee1e655; color-scheme:light; } }
+  :root[data-theme="light"] { --bg:#e8ebf4; --card:rgba(255,255,255,.55); --card-solid:#fff; --edge:rgba(255,255,255,.8); --hi:rgba(255,255,255,.95);
+          --shadow:0 10px 30px rgba(40,50,120,.16), 0 0 0 1px rgba(30,40,100,.06); --overlay:rgba(232,235,244,.62); --fg:#14161c; --mute:#566075;
+          --b1:#ff5fb066; --b2:#7c8cff66; --b3:#5ee1e655; color-scheme:light; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.4 system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:560px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  .row { display:flex; gap:8px; }
+  input { flex:1; padding:12px; border-radius:10px; border:1px solid #0003; background:var(--card); color:var(--fg); font-size:16px; }
+  button { padding:12px 14px; border-radius:10px; border:0; background:var(--acc); color:#fff; font-size:16px; cursor:pointer; }
+  button.ghost { background:var(--card); color:var(--fg); border:1px solid #0003; }
+  .list { margin:8px 0; }
+  .item { background:var(--card); padding:12px; border-radius:10px; margin:6px 0; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
+  .item small { color:var(--mute); }
+  .stop { background:var(--card); border-radius:14px; padding:14px; margin-top:14px; }
+  .stop h2 { font-size:18px; margin:0 0 4px; display:flex; justify-content:space-between; align-items:center; }
+  .meta { color:var(--mute); font-size:13px; margin-bottom:8px; }
+  .pass { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #0002; }
+  .badge { min-width:44px; text-align:center; padding:4px 8px; border-radius:8px; font-weight:700; }
+  .dest { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t { font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .t.live::before { content:"● "; color:var(--ok); font-size:11px; }
+  .t.theo { color:var(--mute); }
+  .err { color:#ff6b6b; font-size:14px; margin-top:8px; }
+  .tabs { display:flex; gap:6px; margin:12px 0 4px; }
+  .tab { flex:1; padding:9px 4px; border-radius:10px; border:1px solid #0003; background:var(--card); color:var(--mute); font-size:15px; }
+  .tab.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .star { background:none; color:var(--mute); padding:0 4px; font-size:22px; }
+  .star.on { color:#f5b301; }
+  .stop h2 .acts { display:flex; align-items:center; }
+  .alert-btn { width:100%; margin-top:10px; background:var(--card); color:var(--fg); border:1px solid #0003; text-align:left; display:flex; justify-content:space-between; align-items:center; }
+  .alert-btn.has { border-color:#f59e0b; }
+  .alert-btn .n { background:#f59e0b; color:#1a1200; border-radius:999px; padding:0 9px; font-weight:700; font-size:14px; }
+  .stop-alert { margin-top:10px; padding:9px 10px; border-radius:10px; background:#f59e0b22; border:1px solid #f59e0b88; font-size:14px; cursor:pointer; }
+  .stop-alert.sev3 { background:#ef444422; border-color:#ef444488; }
+  .stop-alert b { display:block; }
+  #alerts { position:fixed; inset:0; z-index:60; background:var(--bg); overflow-y:auto; padding:max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  #alerts[hidden] { display:none; }
+  .al-wrap { max-width:560px; margin:0 auto; }
+  .al-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .al-top h2 { margin:0; font-size:20px; }
+  .al { background:var(--card); border-radius:12px; padding:12px; margin:10px 0; border-left:5px solid #f59e0b; }
+  .al.sev0 { border-left-color:#3b82f6; } .al.sev3 { border-left-color:#ef4444; }
+  .al .chip { display:inline-block; font-size:12px; font-weight:700; padding:2px 8px; border-radius:999px; background:#f59e0b33; margin-right:6px; }
+  .al .lines { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+  .al .badge { min-width:0; padding:2px 8px; font-size:13px; }
+  .al h3 { font-size:16px; margin:6px 0 4px; }
+  .al p { margin:0; font-size:14px; white-space:pre-line; color:var(--fg); overflow-wrap:anywhere; }
+  .al a { color:var(--acc); font-size:14px; }
+  .al details { margin-top:4px; }
+  .al summary { cursor:pointer; color:var(--mute); font-size:14px; padding:4px 0; }
+  .stop-alert span { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .b-alert { margin-top:8px; padding:10px 14px; border-radius:10px; background:#f59e0b; color:#1a1200; font-size:clamp(15px, 3.6vw, 24px); font-weight:600; line-height:1.25; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .b-alert[hidden] { display:none; }
+  .b-alert.sev3 { background:#dc2626; color:#fff; }
+  .b-alert b { font-weight:800; }
+
+
+  /* Mode panneau : look volontairement fixe (écran sombre, chiffres ambre), quel que soit le thème */
+  #board { position:fixed; inset:0; z-index:50; background:#0b0d10; color:#fff; display:flex; flex-direction:column;
+           padding:max(14px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+           font-family:"Bahnschrift","DIN Alternate","Arial Narrow",system-ui,sans-serif; }
+  #board[hidden] { display:none; }
+  .b-top { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; border-bottom:2px solid #2a2f38; }
+  .b-name { font-size:clamp(20px, 5vw, 34px); font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .b-right { display:flex; align-items:center; gap:10px; }
+  .b-clock { background:#000; border:2px solid #f0a500; color:#ffd34d; font-weight:700; font-size:clamp(18px, 4vw, 28px); padding:2px 10px; border-radius:6px; font-variant-numeric:tabular-nums; }
+  .b-close { background:#20242c; color:#fff; border:1px solid #3a404b; padding:6px 12px; font-size:20px; }
+  .b-rows { flex:1; display:flex; flex-direction:column; justify-content:space-evenly; gap:8px; min-height:0; padding-top:8px; }
+  .b-row { display:flex; flex-direction:column; gap:2px; border-bottom:1px solid #20242c; padding-bottom:6px; }
+  .b-row:last-child { border-bottom:0; }
+  .b-head { display:flex; align-items:center; gap:12px; min-width:0; }
+  .b-badge { min-width:2.2em; height:2.2em; padding:0 .5em; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:clamp(18px, 4.6vw, 30px); }
+  .b-dest { font-size:clamp(18px, 4.6vw, 30px); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .b-times { display:flex; align-items:stretch; justify-content:center; gap:clamp(10px, 4vw, 40px); }
+  .b-cell { flex:1; display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .b-lab { font-size:clamp(13px, 3vw, 20px); color:#aab1bd; }
+  .b-digit { font-size:min(24vw, calc(44vh / var(--rows, 1))); line-height:1; font-weight:800; color:#ffd34d; font-variant-numeric:tabular-nums; text-shadow:0 0 18px #ffb30055; }
+  .b-digit.long { font-size:min(15vw, calc(27vh / var(--rows, 1))); }
+  .b-ralert { margin-top:6px; padding:6px 10px; border-radius:8px; background:#f59e0b; color:#1a1200; font-size:clamp(13px, 3vw, 19px); font-weight:600; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .b-ralert[hidden] { display:none; }
+  .b-ralert, .b-alert { display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .b-ralert .bt, .b-alert .bt { flex:1; min-width:0; display:-webkit-box; -webkit-box-orient:vertical; overflow:hidden; }
+  .b-ralert .bt { -webkit-line-clamp:2; } .b-alert .bt { -webkit-line-clamp:3; }
+  .b-ralert .more, .b-alert .more { flex:none; font-weight:800; text-decoration:underline; white-space:nowrap; }
+  .al.focus { outline:2px solid var(--acc); outline-offset:2px; }
+  .b-ralert.sev3 { background:#dc2626; color:#fff; }
+  .b-digit.none { color:#3a404b; text-shadow:none; }
+  .b-bar { width:clamp(3px, .8vw, 6px); background:#fff; border-radius:3px; align-self:stretch; margin:.4em 0; }
+  .b-digit.blink { animation:bblink 1.6s linear 1; }
+  @keyframes bblink { 0%,25%,50%,75%,100% { opacity:1; } 12%,37%,62% { opacity:.04; } }
+  @media (prefers-reduced-motion: reduce) { .b-digit.blink { animation:none; } }
+  .b-src { font-size:clamp(12px, 2.6vw, 16px); color:#8b93a3; }
+  .b-src.live { color:#2ecc71; }
+  .b-empty { text-align:center; color:#aab1bd; font-size:clamp(18px, 4vw, 28px); margin:auto; }
+
+  /* ---------- Verre dépoli ---------- */
+  body { min-height:100vh; }
+  body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background: radial-gradient(60vmax 60vmax at 8% -8%, var(--b1), transparent 62%),
+                radial-gradient(55vmax 55vmax at 105% 18%, var(--b2), transparent 62%),
+                radial-gradient(65vmax 65vmax at 25% 112%, var(--b3), transparent 62%); }
+  .top { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+  .top h1 { margin:0; }
+  .gear { padding:8px 12px; font-size:20px; line-height:1; border-radius:14px; }
+
+  .stop, .item, .alert-btn, .al, .tab, button.ghost, input#q, .al-top, .sheet {
+    background:var(--card); border:1px solid var(--edge);
+    -webkit-backdrop-filter:blur(22px) saturate(170%); backdrop-filter:blur(22px) saturate(170%);
+    box-shadow:var(--shadow), inset 0 1px 0 var(--hi); }
+  .stop { border-radius:22px; padding:16px; }
+  .item { border-radius:16px; }
+  .alert-btn { border-radius:16px; }
+  .alert-btn.has { border-color:#f59e0b; }
+  input#q { border-radius:16px; color:var(--fg); }
+  input#q:focus { outline:none; border-color:var(--acc); box-shadow:var(--shadow), 0 0 0 3px #e6007e44; }
+  .tab { border-radius:14px; color:var(--mute); }
+  .tab.on { background:var(--acc); color:#fff; border-color:transparent; box-shadow:0 8px 22px #e6007e66, inset 0 1px 0 #ffffff55; }
+  button.ghost { color:var(--fg); border-radius:14px; }
+  button { transition:transform .12s ease, box-shadow .2s ease; }
+  button:active { transform:scale(.97); }
+  .pass { border-top:1px solid var(--edge); }
+  .al { border-radius:18px; border-left:5px solid #f59e0b; }
+  .al.sev0 { border-left-color:#3b82f6; } .al.sev3 { border-left-color:#ef4444; }
+  .stop-alert { border-radius:14px; }
+
+  /* Pages plein écran (infos trafic, réglages) : fond verre + en-tête qui suit le défilement */
+  #alerts, #settings { background:var(--overlay); -webkit-backdrop-filter:blur(26px) saturate(160%); backdrop-filter:blur(26px) saturate(160%); }
+  #settings { position:fixed; inset:0; z-index:70; overflow-y:auto; padding:16px; }
+  #settings[hidden] { display:none; }
+  .al-top { position:sticky; top:8px; z-index:5; padding:8px 8px 8px 16px; border-radius:20px; margin-bottom:10px; }
+  .al-top { background:color-mix(in srgb, var(--card-solid) 82%, transparent); }   /* plus opaque : le texte qui défile dessous reste illisible */
+  .al-top button { padding:8px 14px; }
+  .sheet { border-radius:22px; padding:4px 16px; }
+  .set-row { display:flex; justify-content:space-between; align-items:center; gap:14px; padding:14px 0; border-top:1px solid var(--edge); cursor:pointer; }
+  .set-row:first-child { border-top:0; }
+  .set-row small { display:block; color:var(--mute); font-size:13px; margin-top:2px; }
+  .seg { display:flex; gap:4px; flex:none; }
+  .seg button { background:transparent; color:var(--fg); border:1px solid var(--edge); padding:6px 11px; font-size:14px; border-radius:10px; }
+  .seg button.on { background:var(--acc); color:#fff; border-color:transparent; }
+  input.sw { appearance:none; -webkit-appearance:none; flex:none; width:48px; height:29px; padding:0; border:0; border-radius:999px; background:rgba(128,128,128,.38); position:relative; cursor:pointer; transition:background .2s; }
+  input.sw::after { content:""; position:absolute; top:3px; left:3px; width:23px; height:23px; border-radius:50%; background:#fff; box-shadow:0 2px 6px #0005; transition:transform .2s; }
+  input.sw:checked { background:var(--acc); }
+  input.sw:checked::after { transform:translateX(19px); }
+
+  /* ---------- Mode panneau en verre (reste sombre, comme un vrai écran) ---------- */
+  #board { background:
+      radial-gradient(70vmax 70vmax at 0% -10%, #e6007e66, transparent 60%),
+      radial-gradient(60vmax 60vmax at 110% 25%, #4f46e566, transparent 60%),
+      radial-gradient(70vmax 70vmax at 20% 115%, #06b6d455, transparent 60%),
+      #090b10; }
+  .b-top, .b-row, .b-clock, .b-close {
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16);
+    -webkit-backdrop-filter:blur(22px) saturate(170%); backdrop-filter:blur(22px) saturate(170%);
+    box-shadow:0 10px 30px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.14); }
+  .b-top { border-radius:20px; padding:8px 8px 8px 16px; }
+  .b-clock { background:rgba(0,0,0,.35); border-color:#f0a50099; border-radius:10px; }
+  .b-close { border-radius:12px; }
+  .b-rows { gap:10px; padding-top:10px; }
+  .b-row { border-radius:22px; padding:10px 16px 8px; }
+  .b-digit { font-size:min(22vw, calc(38vh / var(--rows, 1))); }
+  .b-digit.long { font-size:min(14vw, calc(24vh / var(--rows, 1))); }
+  .b-ralert, .b-alert { -webkit-line-clamp:unset; -webkit-box-orient:horizontal; overflow:visible; border-radius:12px; box-shadow:0 6px 18px rgba(0,0,0,.35), inset 0 1px 0 #ffffff55; border:1px solid #ffffff33; }
+  .b-empty { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); border-radius:22px; padding:24px 20px; }
+  :root.noglass #board .b-top, :root.noglass #board .b-row, :root.noglass #board .b-close, :root.noglass #board .b-empty { background:#171a22; }
+
+  /* Panneau : le fond est la page générale, floutée */
+  #board { background:rgba(6,8,14,.6); -webkit-backdrop-filter:blur(28px) saturate(150%); backdrop-filter:blur(28px) saturate(150%); overscroll-behavior:contain; }
+  :root.noglass #board { background:#090b10; }
+  #alerts, #settings { overscroll-behavior:contain; }
+
+  /* Petit métro qui saute pendant les chargements */
+  .loader { display:flex; flex-direction:column; align-items:center; gap:4px; padding:14px 0 8px; color:var(--mute); font-size:14px; }
+  #board .loader { color:#aab1bd; font-size:clamp(15px, 3.4vw, 20px); }
+  .metro { width:72px; height:43px; overflow:visible; animation:hop .7s ease-in-out infinite; transform-origin:50% 100%; }
+  .metro .wheel { transform-box:fill-box; transform-origin:center; animation:spin .35s linear infinite; }
+  .track { width:140px; height:4px; border-radius:2px; background:repeating-linear-gradient(90deg, var(--mute) 0 12px, transparent 12px 22px); opacity:.7; animation:rail .5s linear infinite; }
+  @keyframes hop { 0%,100% { transform:translateY(0) scaleY(.94) rotate(0); } 28% { transform:translateY(-14px) scaleY(1.04) rotate(-4deg); } 50% { transform:translateY(-16px) rotate(3deg); } 74% { transform:translateY(-3px) rotate(0); } }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes rail { to { background-position:-22px 0; } }
+  .nomotion .metro, .nomotion .metro .wheel, .nomotion .track { animation:none; }
+  @media (prefers-reduced-motion: reduce) { .metro, .metro .wheel, .track { animation:none; } }
+
+  /* Les blocs réagissent à la vitesse de défilement (--sv : -1 à 1, --sa : valeur absolue) */
+  .stop, .item, .al, .alert-btn { transform:translateY(calc(var(--sv, 0) * -4px)) skewY(calc(var(--sv, 0) * -1.4deg)) scaleY(calc(1 + var(--sa, 0) * .012)); }
+  body::before { transform:translate3d(0, calc(var(--sy, 0) * -.05px + var(--sv, 0) * -26px), 0) scale(1.18); }
+  .nomotion .stop, .nomotion .item, .nomotion .al, .nomotion .alert-btn, .nomotion body::before { transform:none; }
+  @media (prefers-reduced-motion: reduce) { .stop, .item, .al, .alert-btn, body::before { transform:none; } }
+
+  /* Balayer vers le haut pour fermer */
+  #pullHint { position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); z-index:100; pointer-events:none;
+              padding:9px 16px; border-radius:999px; font-size:14px; font-weight:600; white-space:nowrap; color:#fff;
+              background:rgba(20,22,30,.72); border:1px solid rgba(255,255,255,.2); -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 8px 24px rgba(0,0,0,.4); }
+  #pullHint[hidden] { display:none; }
+
+  /* Sans verre : surfaces pleines (réglage, ancien navigateur, transparence réduite) */
+  :root.noglass { --card:var(--card-solid); --overlay:var(--bg); }
+  .noglass * { -webkit-backdrop-filter:none !important; backdrop-filter:none !important; }
+  @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) { :root { --card:var(--card-solid); --overlay:var(--bg); } }
+  @media (prefers-reduced-transparency: reduce) { :root { --card:var(--card-solid); --overlay:var(--bg); } }
+</style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <h1>🚇 Tisséo Live <small style="font-weight:400;color:var(--mute)">· Toulouse</small></h1>
+    <button class="ghost gear" id="gear" title="Réglages" aria-label="Réglages">⚙</button>
+  </div>
+  <div class="row">
+    <input id="q" placeholder="Rechercher un arrêt (ex. Jean Jaurès, Capitole…)" autocomplete="off">
+    <button class="ghost" id="geo" title="Autour de moi">📍</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-m="all">Tous</button>
+    <button class="tab" data-m="metro">Métro</button>
+    <button class="tab" data-m="tram">Tram</button>
+    <button class="tab" data-m="bus">Bus</button>
+  </div>
+  <div class="list" id="results"></div>
+  <button class="alert-btn" id="alertBtn"><span>⚠ Infos trafic</span><span class="n" id="alertN">…</span></button>
+  <div id="stops"></div>
+</main>
+<div id="settings" hidden>
+  <div class="al-wrap">
+    <div class="al-top"><h2>Réglages</h2><button class="ghost" id="setClose" aria-label="Fermer">✕</button></div>
+    <div class="sheet">
+      <div class="set-row"><span>Apparence</span>
+        <div class="seg" id="segTheme"><button data-v="auto">Auto</button><button data-v="light">Clair</button><button data-v="dark">Sombre</button></div></div>
+      <label class="set-row"><span>Effet verre<small>Transparence et flou. À désactiver si ton téléphone rame.</small></span><input type="checkbox" class="sw" id="s-glass"></label>
+      <label class="set-row"><span>Chiffres qui clignotent<small>Mode panneau : clignote à chaque minute écoulée.</small></span><input type="checkbox" class="sw" id="s-blink"></label>
+      <label class="set-row"><span>Alertes sur le panneau<small>Affiche les perturbations sous chaque ligne.</small></span><input type="checkbox" class="sw" id="s-boardAlerts"></label>
+      <label class="set-row"><span>Écran toujours allumé<small>Mode panneau, si ton navigateur le permet.</small></span><input type="checkbox" class="sw" id="s-wake"></label>
+      <label class="set-row"><span>Animations<small>Métro qui saute pendant le chargement, mouvement des blocs selon la vitesse de défilement.</small></span><input type="checkbox" class="sw" id="s-motion"></label>
+      <label class="set-row"><span>Balayer vers le haut pour fermer<small>Tout en bas d'une page, continue de glisser vers le haut pour revenir en arrière.</small></span><input type="checkbox" class="sw" id="s-swipe"></label>
+    </div>
+  </div>
+</div>
+<div id="pullHint" hidden></div>
+<div id="alerts" hidden>
+  <div class="al-wrap">
+    <div class="al-top"><h2>Infos trafic</h2><button class="ghost" id="alClose">✕</button></div>
+    <div id="alList"></div>
+  </div>
+</div>
+<div id="board" hidden>
+  <div class="b-top">
+    <div class="b-name" id="bName"></div>
+    <div class="b-right"><span class="b-clock" id="bClock"></span><button class="b-close" id="bClose" title="Fermer">✕</button></div>
+  </div>
+  <div class="b-rows" id="bRows"></div>
+  <div class="b-alert" id="bAlert" hidden></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let tracked = [];   // [{name, ids}]
+try { tracked = JSON.parse(localStorage.getItem('tl_stops') || '[]'); } catch (e) {}
+/* ---------- Réglages ---------- */
+const settings = { theme: 'auto', glass: true, blink: true, boardAlerts: true, wake: true, motion: true, swipe: true };
+try { Object.assign(settings, JSON.parse(localStorage.getItem('tl_settings') || '{}')); } catch (e) {}
+function applySettings() {
+  const r = document.documentElement;
+  if (settings.theme === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', settings.theme);
+  r.classList.toggle('noglass', !settings.glass);
+  r.classList.toggle('nomotion', !settings.motion);
+  try { localStorage.setItem('tl_settings', JSON.stringify(settings)); } catch (e) {}
+}
+function syncSettingsUI() {
+  document.querySelectorAll('#segTheme button').forEach(b => b.classList.toggle('on', b.dataset.v === settings.theme));
+  for (const k of ['glass', 'blink', 'boardAlerts', 'wake', 'motion', 'swipe']) $('#s-' + k).checked = !!settings[k];
+}
+applySettings();
+let mode = 'all';
+try { mode = localStorage.getItem('tl_mode') || 'all'; } catch (e) {}
+const data = {};    // name -> {passages, fetched, error, feed_age}
+
+function modeParam() { return mode === 'metro' ? '&mode=metro' : ''; }
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem('tl_mode', m); } catch (e) {}
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('#results').innerHTML = '';
+  const v = $('#q').value.trim();
+  if (v.length >= 2) $('#q').dispatchEvent(new Event('input'));
+  render();
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setMode(b.dataset.m));
+document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+
+function save() { try { localStorage.setItem('tl_stops', JSON.stringify(tracked)); } catch (e) {} }
+
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+let timer;
+$('#q').addEventListener('input', e => {
+  clearTimeout(timer);
+  const v = e.target.value.trim();
+  if (v.length < 2) { $('#results').innerHTML = ''; return; }
+  timer = setTimeout(async () => showResults(await api('/api/search?q=' + encodeURIComponent(v) + modeParam())), 200);
+});
+
+$('#geo').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    async p => showResults(await api(`/api/near?lat=${p.coords.latitude}&lon=${p.coords.longitude}${modeParam()}`)),
+    () => alert('Localisation refusée ou indisponible.'));
+};
+
+function showResults(list) {
+  if (!Array.isArray(list)) { $('#results').innerHTML = `<div class="meta">${esc((list && list.error) || 'Erreur')}</div>`; return; }
+  window._res = list;
+  $('#results').innerHTML = list.map((s, i) =>
+    `<div class="item" onclick="addStop(${i})"><span>${esc(s.name)}</span><small>${s.dist ? s.dist + ' m' : s.ids.length + ' quai(s)'}</small></div>`
+  ).join('') || '<div class="meta">Aucun arrêt trouvé.</div>';
+}
+
+function addStop(i) {
+  const s = window._res[i];
+  if (!tracked.find(t => t.name === s.name)) tracked.unshift({ name: s.name, ids: s.ids });
+  save(); $('#results').innerHTML = ''; $('#q').value = '';
+  refresh(s.name); render();
+}
+function removeStop(name) { tracked = tracked.filter(t => t.name !== name); save(); render(); }
+
+async function refresh(only) {
+  for (const t of tracked) {
+    if (only && t.name !== only) continue;
+    try {
+      const r = await api('/api/next?ids=' + encodeURIComponent(t.ids.join(',')));
+      data[t.name] = { passages: [], ...r, fetched: Date.now() };
+    } catch (e) { data[t.name] = { passages: [], error: 'Serveur injoignable', fetched: Date.now() }; }
+  }
+  render();
+  boardRender();
+}
+
+function fmt(p, fetched) {
+  const sec = p.in_sec - Math.round((Date.now() - fetched) / 1000);
+  if (sec < 45) return 'À quai';
+  const m = Math.round(sec / 60);
+  if (m < 60) return m + ' min';
+  const d = new Date(p.time * 1000);
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function render() {
+  $('#stops').innerHTML = tracked.map((t, i) => {
+    const d = data[t.name];
+    let body = loaderHTML();
+    if (d && d.loading) body = loaderHTML('Chargement des données Tisséo…');
+    else if (d) {
+      const shown = d.passages.filter(p => mode === 'all' || p.type === mode);
+      body = (shown.length ? shown.map(p => `
+        <div class="pass">
+          <span class="badge" style="background:${p.color};color:${p.text_color}">${esc(p.line)}</span>
+          <span class="dest">${esc(p.headsign || '')}</span>
+          <span class="t ${p.live ? 'live' : 'theo'}" title="${p.live ? 'Temps réel' : 'Horaire théorique'}">${fmt(p, d.fetched)}</span>
+        </div>`).join('') : `<div class="meta">Aucun passage ${mode === 'all' ? '' : mode === 'metro' ? 'de métro ' : mode === 'tram' ? 'de tram ' : 'de bus '}prévu dans les prochaines minutes.</div>`);
+      if (d.alerts && d.alerts.length) body += d.alerts.slice(0, 2).map(a => `<div class="stop-alert sev${a.severity}" onclick="openAlerts()"><b>⚠ ${esc(a.label)}${a.lines.length ? ' · ' + esc(a.lines.map(l => l.short).join(', ')) : ''}</b><span>${esc(alertTitle(a))}</span></div>`).join('');
+      if (d.error) body += `<div class="err">${d.loading ? '' : 'Flux temps réel indisponible : '}${esc(d.error)}</div>`;
+    }
+    return `<div class="stop"><h2><span>${esc(t.name)}</span><span class="acts"><button class="star" onclick="openBoard(${i})" title="Mode panneau">📺</button><button class="star on" onclick="removeStop('${esc(t.name).replace(/'/g, "\\'")}')" title="Retirer">★</button></span></h2>${body}</div>`;
+  }).join('');
+}
+
+/* ---------- Infos trafic ---------- */
+let alertsData = [], alertsSig = '';
+
+function openSettings() { syncSettingsUI(); $('#settings').hidden = false; }
+$('#gear').onclick = openSettings;
+$('#setClose').onclick = () => { $('#settings').hidden = true; };
+document.querySelectorAll('#segTheme button').forEach(b => b.onclick = () => { settings.theme = b.dataset.v; applySettings(); syncSettingsUI(); });
+for (const k of ['glass', 'blink', 'boardAlerts', 'wake', 'motion', 'swipe']) {
+  $('#s-' + k).onchange = e => {
+    settings[k] = e.target.checked; applySettings();
+    if (k === 'boardAlerts' || k === 'blink') boardRender();
+  };
+}
+
+/* Petit métro (SVG). Le décalage d'animation suit l'horloge : le rendu se refait chaque seconde sans relancer le saut. */
+function loaderHTML(txt) {
+  const now = Date.now();
+  return `<div class="loader"><svg class="metro" viewBox="0 0 72 43" aria-hidden="true" style="animation-delay:-${now % 700}ms">
+    <rect x="6" y="3" width="60" height="27" rx="10" fill="#e6007e"/>
+    <rect x="13" y="9" width="13" height="10" rx="3" fill="#fff" opacity=".92"/><rect x="30" y="9" width="13" height="10" rx="3" fill="#fff" opacity=".92"/><rect x="47" y="9" width="13" height="10" rx="3" fill="#fff" opacity=".92"/>
+    <rect x="9" y="23" width="54" height="3" rx="1.5" fill="#fff" opacity=".35"/><circle cx="64" cy="22" r="2.4" fill="#ffd34d"/>
+    <g class="wheel" style="animation-delay:-${now % 350}ms"><circle cx="20" cy="35" r="5" fill="#2a2f3a"/><path d="M20 31v8M16 35h8" stroke="#aab1bd" stroke-width="1.4"/></g>
+    <g class="wheel" style="animation-delay:-${now % 350}ms"><circle cx="52" cy="35" r="5" fill="#2a2f3a"/><path d="M52 31v8M48 35h8" stroke="#aab1bd" stroke-width="1.4"/></g>
+  </svg><div class="track" style="animation-delay:-${now % 500}ms"></div><span>${txt || 'Chargement…'}</span></div>`;
+}
+
+// Tisséo envoie du HTML dans ses textes : on le convertit en texte brut (jamais injecté tel quel)
+function htmlToText(s) {
+  if (!s) return '';
+  if (!/[<&]/.test(s)) return s.trim();
+  const doc = new DOMParser().parseFromString(s, 'text/html');
+  const block = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'UL', 'OL', 'TABLE', 'TR']);
+  let out = '';
+  (function walk(n) {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) out += c.nodeValue.replace(/\u00a0/g, ' ');
+      else if (c.nodeType === 1) {
+        const t = c.tagName;
+        if (t === 'BR') { out += '\n'; continue; }
+        if (t === 'SCRIPT' || t === 'STYLE') continue;
+        if (t === 'LI') out += '\n• '; else if (block.has(t)) out += '\n';
+        walk(c);
+        if (block.has(t)) out += '\n';
+      }
+    }
+  })(doc.body);
+  return out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function alertHeader(a) { if (a._h === undefined) a._h = htmlToText(a.header); return a._h; }
+function alertDesc(a) { if (a._d === undefined) a._d = htmlToText(a.desc); return a._d; }
+// titre court : 1re ligne de la description (plus précise que l'en-tête, souvent générique)
+function alertTitle(a) {
+  const first = alertDesc(a).split('\n').map(x => x.trim()).find(x => x);
+  return first || alertHeader(a);
+}
+async function loadAlerts() {
+  try {
+    const r = await api('/api/alerts');
+    if (!Array.isArray(r)) return;
+    alertsData = r;
+    $('#alertN').textContent = r.length;
+    $('#alertBtn').classList.toggle('has', r.length > 0);
+    const sig = JSON.stringify(r.map(a => [a.header, a.desc, a.severity]));
+    if (sig !== alertsSig) { alertsSig = sig; if (!$('#alerts').hidden) renderAlerts(); }   // ne referme pas les détails ouverts
+  } catch (e) {}
+}
+function renderAlerts() {
+  $('#alList').innerHTML = alertsData.length ? alertsData.map((a, i) => `
+    <div class="al sev${a.severity}" id="al-${i}">
+      <span class="chip">${esc(a.label)}</span>
+      <div class="lines">${a.lines.length ? a.lines.map(l => `<span class="badge" style="background:${l.color};color:${l.text_color}">${esc(l.short)}</span>`).join('') : '<small class="meta">Tout le réseau ou arrêts précis</small>'}</div>
+      ${alertHeader(a) ? `<h3>${esc(alertHeader(a))}</h3>` : ''}
+      ${alertDesc(a) ? (alertDesc(a).length < 220 ? `<p>${esc(alertDesc(a))}</p>` : `<p><b>${esc(alertTitle(a))}</b></p><details><summary>Voir les détails</summary><p>${esc(alertDesc(a))}</p></details>`) : ''}
+      ${/^https?:\/\//.test(a.url) ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Plus d'infos</a>` : ''}
+    </div>`).join('') : '<div class="meta">Aucune perturbation signalée pour le moment.</div>';
+}
+function openAlerts(focus) {
+  renderAlerts();
+  $('#alerts').hidden = false;
+  $('#alerts').scrollTop = 0;
+  if (!focus || !focus.header && !focus.desc) return;
+  const i = alertsData.findIndex(x => x.header === focus.header && x.desc === focus.desc);
+  const el = i >= 0 ? document.getElementById('al-' + i) : null;
+  if (!el) return;
+  el.classList.add('focus');
+  const det = el.querySelector('details'); if (det) det.open = true;
+  el.scrollIntoView({ block: 'start' });
+}
+$('#alertBtn').onclick = openAlerts;
+$('#alClose').onclick = () => { $('#alerts').hidden = true; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#alerts').hidden = true; });
+
+/* ---------- Mode panneau ---------- */
+let boardName = null, boardSig = '', boardLast = {}, wake = null;
+
+let boardRoutes = [];   // route_id de chaque ligne du panneau (dans l'ordre)
+
+function alertText(a, idx, n) {
+  return '⚠ ' + a.label + (n > 1 ? ' (' + (idx + 1) + '/' + n + ')' : '') + '\u00a0—\u00a0' + alertTitle(a);
+}
+function setAlertEl(el, list) {
+  if (!list.length) { el.hidden = true; el.dataset.t = ''; el._a = null; return; }
+  const i = Math.floor(Date.now() / 7000) % list.length, a = list[i];
+  const txt = alertText(a, i, list.length);
+  el.hidden = false;
+  el.className = el.className.replace(/\bsev3\b/g, '').trim() + (a.severity >= 3 ? ' sev3' : '');
+  el._a = a;
+  if (!el.onclick) el.onclick = () => { if (el._a) openAlerts(el._a); };
+  if (el.dataset.t !== txt) {
+    el.dataset.t = txt;
+    const t = document.createElement('span'); t.className = 'bt'; t.textContent = txt;
+    const m = document.createElement('span'); m.className = 'more'; m.textContent = 'En savoir plus ›';
+    el.replaceChildren(t, m);
+  }
+}
+function boardAlertRender() {
+  const d = data[boardName], t = tracked.find(x => x.name === boardName);
+  if (!settings.boardAlerts) { document.querySelectorAll('[data-ra], #bAlert').forEach(el => { el.hidden = true; el.dataset.t = ''; }); return; }
+  if (!d) return;
+  // 1) sous chaque transport : les alertes de SA ligne
+  boardRoutes.forEach((rid, r) => {
+    const el = document.querySelector(`[data-ra="${r}"]`);
+    if (el) setAlertEl(el, alertsData.filter(a => a.routes.includes(rid)));
+  });
+  // 2) bandeau du bas : alertes de l'arrêt, ou de tout le réseau si ce n'est pas une simple information
+  const ids = new Set(t ? t.ids : []);
+  const general = alertsData.filter(a => !a.routes.length && (a.stops.some(s => ids.has(s)) || (!a.stops.length && a.severity >= 1)));
+  setAlertEl($('#bAlert'), general);
+}
+
+function remainSec(p, fetched) { return p.in_sec - Math.round((Date.now() - fetched) / 1000); }
+
+function boardGroups() {
+  const d = data[boardName];
+  if (!d) return null;
+  const groups = new Map();
+  for (const p of d.passages) {
+    if (mode !== 'all' && p.type !== mode) continue;
+    const k = p.line + '|' + (p.headsign || '');
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  }
+  return [...groups.entries()]
+    .map(([key, ps]) => ({ key, ps: ps.slice(0, 2) }))
+    .sort((a, b) => a.ps[0].time - b.ps[0].time)
+    .slice(0, 4);
+}
+
+function cellText(p, fetched) {
+  if (!p) return { txt: '–', cls: 'none' };
+  const m = Math.max(0, Math.round(remainSec(p, fetched) / 60));
+  if (m >= 60) return { txt: new Date(p.time * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }), cls: 'long' };
+  return { txt: String(m), cls: '' };
+}
+
+function boardRender() {
+  if (boardName === null) return;
+  $('#bName').textContent = boardName;
+  $('#bClock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const d = data[boardName], groups = boardGroups();
+  const rowsEl = $('#bRows');
+  if (!d || !groups) { rowsEl.innerHTML = '<div class="b-empty">' + loaderHTML() + '</div>'; boardSig = ''; boardRoutes = []; boardAlertRender(); return; }
+  if (!groups.length) {
+    rowsEl.innerHTML = '<div class="b-empty">Aucun passage prévu pour le moment' + (d.error ? '<br><small>' + esc(d.error) + '</small>' : '') + '</div>';
+    boardSig = ''; boardRoutes = []; boardAlertRender(); return;
+  }
+  const sig = groups.map(g => g.key).join('#');
+  const labels = ['1er', '2e'];
+  if (sig !== boardSig) {            // structure changée : on reconstruit
+    boardSig = sig; boardLast = {};
+    rowsEl.style.setProperty('--rows', groups.length);
+    rowsEl.innerHTML = groups.map((g, r) => {
+      const p = g.ps[0];
+      const typ = { metro: 'métro', tram: 'tram', bus: 'bus' }[p.type] || '';
+      return `<div class="b-row">
+        <div class="b-head"><span class="b-badge" style="background:${p.color};color:${p.text_color}">${esc(p.line)}</span><span class="b-dest">${esc(p.headsign || '')}</span></div>
+        <div class="b-times">
+          <div class="b-cell"><span class="b-lab">${labels[0]} ${typ}</span><span class="b-digit" data-c="${r}-0"></span></div>
+          <div class="b-bar"></div>
+          <div class="b-cell"><span class="b-lab">${labels[1]} ${typ}</span><span class="b-digit" data-c="${r}-1"></span></div>
+        </div>
+        <div class="b-ralert" data-ra="${r}" hidden></div>
+        <div class="b-src" data-s="${r}"></div>
+      </div>`;
+    }).join('');
+  }
+  boardRoutes = groups.map(g => g.ps[0].route_id);
+  groups.forEach((g, r) => {
+    for (let i = 0; i < 2; i++) {
+      const el = rowsEl.querySelector(`[data-c="${r}-${i}"]`);
+      if (!el) continue;
+      const c = cellText(g.ps[i], d.fetched), id = r + '-' + i;
+      el.className = 'b-digit ' + c.cls;
+      if (el.textContent !== c.txt) {
+        el.textContent = c.txt;
+        if (settings.blink && boardLast[id] !== undefined && c.cls !== 'none') {   // un chiffre a changé : il clignote
+          el.classList.remove('blink'); void el.offsetWidth; el.classList.add('blink');
+        }
+      }
+      boardLast[id] = c.txt;
+    }
+    const s = rowsEl.querySelector(`[data-s="${r}"]`);
+    if (s) { s.className = 'b-src' + (g.ps[0].live ? ' live' : ''); s.textContent = g.ps[0].live ? '● temps réel' : 'horaire théorique'; }
+  });
+  boardAlertRender();
+}
+
+async function openBoard(i) {
+  boardName = tracked[i].name; boardSig = ''; boardLast = {};
+  $('#board').hidden = false;
+  boardRender();
+  if (settings.wake) { try { wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; } }
+}
+function closeBoard() {
+  boardName = null; $('#board').hidden = true;
+  try { if (wake) wake.release(); } catch (e) {}
+  wake = null;
+}
+$('#bClose').onclick = closeBoard;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#alerts').hidden && $('#settings').hidden) closeBoard(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#settings').hidden = true; });
+
+/* ---------- Mouvement selon la vitesse de défilement ---------- */
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let sv = 0, svTarget = 0, svRunning = false;
+const lastPos = new WeakMap();
+document.addEventListener('scroll', e => {
+  if (!settings.motion || reduceMotion) return;
+  const t = e.target, y = (t === document) ? window.scrollY : t.scrollTop, now = performance.now(), prev = lastPos.get(t);
+  if (prev) svTarget = Math.max(-1, Math.min(1, (y - prev.y) / Math.max(now - prev.t, 1) / 2));   // px/ms -> -1..1
+  lastPos.set(t, { y, t: now });
+  if (t === document) document.documentElement.style.setProperty('--sy', y);
+  if (!svRunning) { svRunning = true; requestAnimationFrame(svTick); }
+}, { capture: true, passive: true });
+function svTick() {
+  const r = document.documentElement.style;
+  sv += (svTarget - sv) * 0.2; svTarget *= 0.9;
+  if (Math.abs(sv) < 0.002 && Math.abs(svTarget) < 0.002) { sv = svTarget = 0; r.setProperty('--sv', '0'); r.setProperty('--sa', '0'); svRunning = false; return; }
+  r.setProperty('--sv', sv.toFixed(3)); r.setProperty('--sa', Math.abs(sv).toFixed(3));
+  requestAnimationFrame(svTick);
+}
+
+/* ---------- Balayer vers le haut, tout en bas, pour fermer ---------- */
+function enableSwipeClose(el, closeFn, scroller) {
+  const THRESH = 110, hint = $('#pullHint');
+  let startY = null, anchor = null, pull = 0;
+  const atBottom = () => !scroller || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+  const apply = p => {
+    el.style.transform = p ? `translateY(${-p * 0.6}px)` : '';
+    hint.hidden = p < 14;
+    if (!hint.hidden) hint.textContent = p > THRESH ? '↑ Relâche pour fermer' : '↑ Continue pour fermer';
+  };
+  el.addEventListener('touchstart', e => { if (e.touches.length === 1) { startY = e.touches[0].clientY; anchor = null; pull = 0; el.style.transition = 'none'; } }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (startY === null || !settings.swipe) return;
+    const y = e.touches[0].clientY;
+    if (!atBottom()) { anchor = null; if (pull) { pull = 0; apply(0); } return; }
+    if (anchor === null) anchor = y;               // on compte à partir du moment où on est arrivé en bas
+    pull = Math.max(0, anchor - y);
+    if (pull > 0 && e.cancelable) e.preventDefault();
+    apply(pull);
+  }, { passive: false });
+  const end = () => {
+    if (startY === null) return;
+    const done = pull > THRESH;
+    startY = null; anchor = null; hint.hidden = true;
+    el.style.transition = 'transform .28s ease';
+    if (done) {
+      el.style.transform = 'translateY(-100%)';
+      setTimeout(() => { closeFn(); el.style.transition = ''; el.style.transform = ''; }, 280);
+    } else { el.style.transform = ''; setTimeout(() => { el.style.transition = ''; }, 300); }
+    pull = 0;
+  };
+  el.addEventListener('touchend', end, { passive: true });
+  el.addEventListener('touchcancel', end, { passive: true });
+}
+enableSwipeClose($('#board'), closeBoard, null);
+enableSwipeClose($('#alerts'), () => { $('#alerts').hidden = true; }, $('#alerts'));
+enableSwipeClose($('#settings'), () => { $('#settings').hidden = true; }, $('#settings'));
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+render();
+refresh();
+loadAlerts();
+setInterval(loadAlerts, 60000);
+setInterval(refresh, 10000);   // récupère le flux toutes les 10 s
+setInterval(() => { render(); boardRender(); }, 1000);     // décompte local à la seconde
+</script>
+</body>
+</html>
