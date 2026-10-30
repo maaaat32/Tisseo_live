@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tisséo Live</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/icon.svg">
+<meta name="theme-color" content="#e6007e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tisséo Live">
+<style>
+  :root { --bg:#0f1115; --card:#181b22; --fg:#f2f4f8; --mute:#8b93a3; --acc:#e6007e; --ok:#2ecc71; }
+  @media (prefers-color-scheme: light) { :root { --bg:#f4f5f8; --card:#fff; --fg:#14161c; --mute:#6b7280; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.4 system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:560px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:0 0 12px; }
+  .row { display:flex; gap:8px; }
+  input { flex:1; padding:12px; border-radius:10px; border:1px solid #0003; background:var(--card); color:var(--fg); font-size:16px; }
+  button { padding:12px 14px; border-radius:10px; border:0; background:var(--acc); color:#fff; font-size:16px; cursor:pointer; }
+  button.ghost { background:var(--card); color:var(--fg); border:1px solid #0003; }
+  .list { margin:8px 0; }
+  .item { background:var(--card); padding:12px; border-radius:10px; margin:6px 0; cursor:pointer; display:flex; justify-content:space-between; gap:8px; }
+  .item small { color:var(--mute); }
+  .stop { background:var(--card); border-radius:14px; padding:14px; margin-top:14px; }
+  .stop h2 { font-size:18px; margin:0 0 4px; display:flex; justify-content:space-between; align-items:center; }
+  .meta { color:var(--mute); font-size:13px; margin-bottom:8px; }
+  .pass { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid #0002; }
+  .badge { min-width:44px; text-align:center; padding:4px 8px; border-radius:8px; font-weight:700; }
+  .dest { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .t { font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .t.live::before { content:"● "; color:var(--ok); font-size:11px; }
+  .t.theo { color:var(--mute); }
+  .err { color:#ff6b6b; font-size:14px; margin-top:8px; }
+  .tabs { display:flex; gap:6px; margin:12px 0 4px; }
+  .tab { flex:1; padding:9px 4px; border-radius:10px; border:1px solid #0003; background:var(--card); color:var(--mute); font-size:15px; }
+  .tab.on { background:var(--acc); color:#fff; border-color:var(--acc); }
+  .star { background:none; color:var(--mute); padding:0 4px; font-size:22px; }
+  .star.on { color:#f5b301; }
+  .stop h2 .acts { display:flex; align-items:center; }
+  .alert-btn { width:100%; margin-top:10px; background:var(--card); color:var(--fg); border:1px solid #0003; text-align:left; display:flex; justify-content:space-between; align-items:center; }
+  .alert-btn.has { border-color:#f59e0b; }
+  .alert-btn .n { background:#f59e0b; color:#1a1200; border-radius:999px; padding:0 9px; font-weight:700; font-size:14px; }
+  .stop-alert { margin-top:10px; padding:9px 10px; border-radius:10px; background:#f59e0b22; border:1px solid #f59e0b88; font-size:14px; cursor:pointer; }
+  .stop-alert.sev3 { background:#ef444422; border-color:#ef444488; }
+  .stop-alert b { display:block; }
+  #alerts { position:fixed; inset:0; z-index:40; background:var(--bg); overflow-y:auto; padding:max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  #alerts[hidden] { display:none; }
+  .al-wrap { max-width:560px; margin:0 auto; }
+  .al-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+  .al-top h2 { margin:0; font-size:20px; }
+  .al { background:var(--card); border-radius:12px; padding:12px; margin:10px 0; border-left:5px solid #f59e0b; }
+  .al.sev0 { border-left-color:#3b82f6; } .al.sev3 { border-left-color:#ef4444; }
+  .al .chip { display:inline-block; font-size:12px; font-weight:700; padding:2px 8px; border-radius:999px; background:#f59e0b33; margin-right:6px; }
+  .al .lines { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+  .al .badge { min-width:0; padding:2px 8px; font-size:13px; }
+  .al h3 { font-size:16px; margin:6px 0 4px; }
+  .al p { margin:0; font-size:14px; white-space:pre-line; color:var(--fg); overflow-wrap:anywhere; }
+  .al a { color:var(--acc); font-size:14px; }
+
+
+  /* Mode panneau : look volontairement fixe (écran sombre, chiffres ambre), quel que soit le thème */
+  #board { position:fixed; inset:0; z-index:50; background:#0b0d10; color:#fff; display:flex; flex-direction:column;
+           padding:max(14px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(14px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+           font-family:"Bahnschrift","DIN Alternate","Arial Narrow",system-ui,sans-serif; }
+  #board[hidden] { display:none; }
+  .b-top { display:flex; align-items:center; justify-content:space-between; gap:12px; padding-bottom:10px; border-bottom:2px solid #2a2f38; }
+  .b-name { font-size:clamp(20px, 5vw, 34px); font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .b-right { display:flex; align-items:center; gap:10px; }
+  .b-clock { background:#000; border:2px solid #f0a500; color:#ffd34d; font-weight:700; font-size:clamp(18px, 4vw, 28px); padding:2px 10px; border-radius:6px; font-variant-numeric:tabular-nums; }
+  .b-close { background:#20242c; color:#fff; border:1px solid #3a404b; padding:6px 12px; font-size:20px; }
+  .b-rows { flex:1; display:flex; flex-direction:column; justify-content:space-evenly; gap:8px; min-height:0; padding-top:8px; }
+  .b-row { display:flex; flex-direction:column; gap:2px; border-bottom:1px solid #20242c; padding-bottom:6px; }
+  .b-row:last-child { border-bottom:0; }
+  .b-head { display:flex; align-items:center; gap:12px; min-width:0; }
+  .b-badge { min-width:2.2em; height:2.2em; padding:0 .5em; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:clamp(18px, 4.6vw, 30px); }
+  .b-dest { font-size:clamp(18px, 4.6vw, 30px); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .b-times { display:flex; align-items:stretch; justify-content:center; gap:clamp(10px, 4vw, 40px); }
+  .b-cell { flex:1; display:flex; flex-direction:column; align-items:center; min-width:0; }
+  .b-lab { font-size:clamp(13px, 3vw, 20px); color:#aab1bd; }
+  .b-digit { font-size:min(24vw, calc(60vh / var(--rows, 1))); line-height:1; font-weight:800; color:#ffd34d; font-variant-numeric:tabular-nums; text-shadow:0 0 18px #ffb30055; }
+  .b-digit.long { font-size:min(15vw, calc(38vh / var(--rows, 1))); }
+  .b-digit.none { color:#3a404b; text-shadow:none; }
+  .b-bar { width:clamp(3px, .8vw, 6px); background:#fff; border-radius:3px; align-self:stretch; margin:.4em 0; }
+  .b-digit.blink { animation:bblink 1.6s linear 1; }
+  @keyframes bblink { 0%,25%,50%,75%,100% { opacity:1; } 12%,37%,62% { opacity:.04; } }
+  @media (prefers-reduced-motion: reduce) { .b-digit.blink { animation:none; } }
+  .b-src { font-size:clamp(12px, 2.6vw, 16px); color:#8b93a3; }
+  .b-src.live { color:#2ecc71; }
+  .b-empty { text-align:center; color:#aab1bd; font-size:clamp(18px, 4vw, 28px); margin:auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🚇 Tisséo Live <small style="font-weight:400;color:var(--mute)">· Toulouse</small></h1>
+  <div class="row">
+    <input id="q" placeholder="Rechercher un arrêt (ex. Jean Jaurès, Capitole…)" autocomplete="off">
+    <button class="ghost" id="geo" title="Autour de moi">📍</button>
+  </div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-m="all">Tous</button>
+    <button class="tab" data-m="metro">Métro</button>
+    <button class="tab" data-m="tram">Tram</button>
+    <button class="tab" data-m="bus">Bus</button>
+  </div>
+  <div class="list" id="results"></div>
+  <button class="alert-btn" id="alertBtn"><span>⚠ Infos trafic</span><span class="n" id="alertN">…</span></button>
+  <div id="stops"></div>
+</main>
+<div id="alerts" hidden>
+  <div class="al-wrap">
+    <div class="al-top"><h2>Infos trafic</h2><button class="ghost" id="alClose">✕</button></div>
+    <div id="alList"></div>
+  </div>
+</div>
+<div id="board" hidden>
+  <div class="b-top">
+    <div class="b-name" id="bName"></div>
+    <div class="b-right"><span class="b-clock" id="bClock"></span><button class="b-close" id="bClose" title="Fermer">✕</button></div>
+  </div>
+  <div class="b-rows" id="bRows"></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let tracked = [];   // [{name, ids}]
+try { tracked = JSON.parse(localStorage.getItem('tl_stops') || '[]'); } catch (e) {}
+let mode = 'all';
+try { mode = localStorage.getItem('tl_mode') || 'all'; } catch (e) {}
+const data = {};    // name -> {passages, fetched, error, feed_age}
+
+function modeParam() { return mode === 'metro' ? '&mode=metro' : ''; }
+function setMode(m) {
+  mode = m;
+  try { localStorage.setItem('tl_mode', m); } catch (e) {}
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  $('#results').innerHTML = '';
+  const v = $('#q').value.trim();
+  if (v.length >= 2) $('#q').dispatchEvent(new Event('input'));
+  render();
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => setMode(b.dataset.m));
+document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.m === mode));
+
+function save() { try { localStorage.setItem('tl_stops', JSON.stringify(tracked)); } catch (e) {} }
+
+async function api(path) {
+  const r = await fetch(path);
+  return r.json();
+}
+
+let timer;
+$('#q').addEventListener('input', e => {
+  clearTimeout(timer);
+  const v = e.target.value.trim();
+  if (v.length < 2) { $('#results').innerHTML = ''; return; }
+  timer = setTimeout(async () => showResults(await api('/api/search?q=' + encodeURIComponent(v) + modeParam())), 200);
+});
+
+$('#geo').onclick = () => {
+  navigator.geolocation.getCurrentPosition(
+    async p => showResults(await api(`/api/near?lat=${p.coords.latitude}&lon=${p.coords.longitude}${modeParam()}`)),
+    () => alert('Localisation refusée ou indisponible.'));
+};
+
+function showResults(list) {
+  if (!Array.isArray(list)) { $('#results').innerHTML = `<div class="meta">${esc((list && list.error) || 'Erreur')}</div>`; return; }
+  window._res = list;
+  $('#results').innerHTML = list.map((s, i) =>
+    `<div class="item" onclick="addStop(${i})"><span>${esc(s.name)}</span><small>${s.dist ? s.dist + ' m' : s.ids.length + ' quai(s)'}</small></div>`
+  ).join('') || '<div class="meta">Aucun arrêt trouvé.</div>';
+}
+
+function addStop(i) {
+  const s = window._res[i];
+  if (!tracked.find(t => t.name === s.name)) tracked.unshift({ name: s.name, ids: s.ids });
+  save(); $('#results').innerHTML = ''; $('#q').value = '';
+  refresh(s.name); render();
+}
+function removeStop(name) { tracked = tracked.filter(t => t.name !== name); save(); render(); }
+
+async function refresh(only) {
+  for (const t of tracked) {
+    if (only && t.name !== only) continue;
+    try {
+      const r = await api('/api/next?ids=' + encodeURIComponent(t.ids.join(',')));
+      data[t.name] = { passages: [], ...r, fetched: Date.now() };
+    } catch (e) { data[t.name] = { passages: [], error: 'Serveur injoignable', fetched: Date.now() }; }
+  }
+  render();
+  boardRender();
+}
+
+function fmt(p, fetched) {
+  const sec = p.in_sec - Math.round((Date.now() - fetched) / 1000);
+  if (sec < 45) return 'À quai';
+  const m = Math.round(sec / 60);
+  if (m < 60) return m + ' min';
+  const d = new Date(p.time * 1000);
+  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function render() {
+  $('#stops').innerHTML = tracked.map((t, i) => {
+    const d = data[t.name];
+    let body = '<div class="meta">Chargement…</div>';
+    if (d) {
+      const shown = d.passages.filter(p => mode === 'all' || p.type === mode);
+      body = (shown.length ? shown.map(p => `
+        <div class="pass">
+          <span class="badge" style="background:${p.color};color:${p.text_color}">${esc(p.line)}</span>
+          <span class="dest">${esc(p.headsign || '')}</span>
+          <span class="t ${p.live ? 'live' : 'theo'}" title="${p.live ? 'Temps réel' : 'Horaire théorique'}">${fmt(p, d.fetched)}</span>
+        </div>`).join('') : `<div class="meta">Aucun passage ${mode === 'all' ? '' : mode === 'metro' ? 'de métro ' : mode === 'tram' ? 'de tram ' : 'de bus '}prévu dans les prochaines minutes.</div>`);
+      if (d.alerts && d.alerts.length) body += d.alerts.slice(0, 2).map(a => `<div class="stop-alert sev${a.severity}" onclick="openAlerts()"><b>⚠ ${esc(a.label)}${a.lines.length ? ' · ' + esc(a.lines.map(l => l.short).join(', ')) : ''}</b>${esc(a.header || a.desc)}</div>`).join('');
+      if (d.error) body += `<div class="err">${d.loading ? '' : 'Flux temps réel indisponible : '}${esc(d.error)}</div>`;
+    }
+    return `<div class="stop"><h2><span>${esc(t.name)}</span><span class="acts"><button class="star" onclick="openBoard(${i})" title="Mode panneau">📺</button><button class="star on" onclick="removeStop('${esc(t.name).replace(/'/g, "\\'")}')" title="Retirer">★</button></span></h2>${body}</div>`;
+  }).join('');
+}
+
+/* ---------- Infos trafic ---------- */
+let alertsData = [];
+async function loadAlerts() {
+  try {
+    const r = await api('/api/alerts');
+    if (!Array.isArray(r)) return;
+    alertsData = r;
+    $('#alertN').textContent = r.length;
+    $('#alertBtn').classList.toggle('has', r.length > 0);
+    if (!$('#alerts').hidden) renderAlerts();
+  } catch (e) {}
+}
+function renderAlerts() {
+  $('#alList').innerHTML = alertsData.length ? alertsData.map(a => `
+    <div class="al sev${a.severity}">
+      <span class="chip">${esc(a.label)}</span>
+      <div class="lines">${a.lines.length ? a.lines.map(l => `<span class="badge" style="background:${l.color};color:${l.text_color}">${esc(l.short)}</span>`).join('') : '<small class="meta">Tout le réseau ou arrêts précis</small>'}</div>
+      ${a.header ? `<h3>${esc(a.header)}</h3>` : ''}
+      ${a.desc ? `<p>${esc(a.desc)}</p>` : ''}
+      ${/^https?:\/\//.test(a.url) ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Plus d'infos</a>` : ''}
+    </div>`).join('') : '<div class="meta">Aucune perturbation signalée pour le moment.</div>';
+}
+function openAlerts() { renderAlerts(); $('#alerts').hidden = false; }
+$('#alertBtn').onclick = openAlerts;
+$('#alClose').onclick = () => { $('#alerts').hidden = true; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#alerts').hidden = true; });
+
+/* ---------- Mode panneau ---------- */
+let boardName = null, boardSig = '', boardLast = {}, wake = null;
+
+function remainSec(p, fetched) { return p.in_sec - Math.round((Date.now() - fetched) / 1000); }
+
+function boardGroups() {
+  const d = data[boardName];
+  if (!d) return null;
+  const groups = new Map();
+  for (const p of d.passages) {
+    if (mode !== 'all' && p.type !== mode) continue;
+    const k = p.line + '|' + (p.headsign || '');
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  }
+  return [...groups.entries()]
+    .map(([key, ps]) => ({ key, ps: ps.slice(0, 2) }))
+    .sort((a, b) => a.ps[0].time - b.ps[0].time)
+    .slice(0, 4);
+}
+
+function cellText(p, fetched) {
+  if (!p) return { txt: '–', cls: 'none' };
+  const m = Math.max(0, Math.round(remainSec(p, fetched) / 60));
+  if (m >= 60) return { txt: new Date(p.time * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }), cls: 'long' };
+  return { txt: String(m), cls: '' };
+}
+
+function boardRender() {
+  if (boardName === null) return;
+  $('#bName').textContent = boardName;
+  $('#bClock').textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const d = data[boardName], groups = boardGroups();
+  const rowsEl = $('#bRows');
+  if (!d || !groups) { rowsEl.innerHTML = '<div class="b-empty">Chargement…</div>'; boardSig = ''; return; }
+  if (!groups.length) {
+    rowsEl.innerHTML = '<div class="b-empty">Aucun passage prévu pour le moment' + (d.error ? '<br><small>' + esc(d.error) + '</small>' : '') + '</div>';
+    boardSig = ''; return;
+  }
+  const sig = groups.map(g => g.key).join('#');
+  const labels = ['1er', '2e'];
+  if (sig !== boardSig) {            // structure changée : on reconstruit
+    boardSig = sig; boardLast = {};
+    rowsEl.style.setProperty('--rows', groups.length);
+    rowsEl.innerHTML = groups.map((g, r) => {
+      const p = g.ps[0];
+      const typ = { metro: 'métro', tram: 'tram', bus: 'bus' }[p.type] || '';
+      return `<div class="b-row">
+        <div class="b-head"><span class="b-badge" style="background:${p.color};color:${p.text_color}">${esc(p.line)}</span><span class="b-dest">${esc(p.headsign || '')}</span></div>
+        <div class="b-times">
+          <div class="b-cell"><span class="b-lab">${labels[0]} ${typ}</span><span class="b-digit" data-c="${r}-0"></span></div>
+          <div class="b-bar"></div>
+          <div class="b-cell"><span class="b-lab">${labels[1]} ${typ}</span><span class="b-digit" data-c="${r}-1"></span></div>
+        </div>
+        <div class="b-src" data-s="${r}"></div>
+      </div>`;
+    }).join('');
+  }
+  groups.forEach((g, r) => {
+    for (let i = 0; i < 2; i++) {
+      const el = rowsEl.querySelector(`[data-c="${r}-${i}"]`);
+      if (!el) continue;
+      const c = cellText(g.ps[i], d.fetched), id = r + '-' + i;
+      el.className = 'b-digit ' + c.cls;
+      if (el.textContent !== c.txt) {
+        el.textContent = c.txt;
+        if (boardLast[id] !== undefined && c.cls !== 'none') {   // un chiffre a changé : il clignote
+          el.classList.remove('blink'); void el.offsetWidth; el.classList.add('blink');
+        }
+      }
+      boardLast[id] = c.txt;
+    }
+    const s = rowsEl.querySelector(`[data-s="${r}"]`);
+    if (s) { s.className = 'b-src' + (g.ps[0].live ? ' live' : ''); s.textContent = g.ps[0].live ? '● temps réel' : 'horaire théorique'; }
+  });
+}
+
+async function openBoard(i) {
+  boardName = tracked[i].name; boardSig = ''; boardLast = {};
+  $('#board').hidden = false;
+  boardRender();
+  try { wake = await navigator.wakeLock.request('screen'); } catch (e) { wake = null; }
+}
+function closeBoard() {
+  boardName = null; $('#board').hidden = true;
+  try { if (wake) wake.release(); } catch (e) {}
+  wake = null;
+}
+$('#bClose').onclick = closeBoard;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBoard(); });
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+refresh();
+loadAlerts();
+setInterval(loadAlerts, 60000);
+setInterval(refresh, 10000);   // récupère le flux toutes les 10 s
+setInterval(() => { render(); boardRender(); }, 1000);     // décompte local à la seconde
+</script>
+</body>
+</html>
