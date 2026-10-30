@@ -1,0 +1,10 @@
+{
+  "name": "Tisséo Live",
+  "short_name": "Tisséo Live",
+  "description": "Prochains passages en temps réel à Toulouse",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#e6007e",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
